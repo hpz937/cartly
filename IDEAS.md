@@ -12,10 +12,10 @@ This document tracks potential features, enhancements, and improvements for Cart
 - [ ] Sort recipes by name, date created, or most recently used
 
 ### Recipe Scaling
-- [ ] Add servings adjuster with +/- buttons
-- [ ] Automatically scale all ingredient quantities
-- [ ] Handle fractional conversions (1/2 cup → 1 cup when doubling)
-- [ ] Preserve original servings in recipe data
+- [x] Add servings adjuster with +/- buttons
+- [x] Automatically scale all ingredient quantities
+- [x] Handle fractional conversions (1/2 cup → 1 cup when doubling)
+- [x] Preserve original servings in recipe data
 
 ### Missing Test Coverage
 - [ ] Add tests for recipe import/export functionality
@@ -198,6 +198,7 @@ Have an idea not listed here? Add it! Feel free to:
 
 ## Recently Completed
 
+- ✅ Recipe scaling with servings adjuster (2026-02-01)
 - ✅ Recipe import/export in JSON format (2026-02-01)
 - ✅ Drag-and-drop reordering for ingredients and steps (2026-02-01)
 - ✅ Notes field for recipes (2026-02-01)

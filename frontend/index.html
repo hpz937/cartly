@@ -414,6 +414,27 @@ button {
   color: var(--text);
   margin-bottom: 12px;
 }
+.recipe-scale-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--accent-lo);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.recipe-scale-controls__label {
+  font-size: .9rem;
+  font-weight: 500;
+  color: var(--text-mid);
+}
+.recipe-scale-controls__value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 32px;
+  text-align: center;
+}
 .recipe-section__list {
   display: flex;
   flex-direction: column;
@@ -684,6 +705,7 @@ let recipes     = [];
 let currentRecipe = null;
 let recipeIngredients = [];
 let recipeSteps = [];
+let currentScaleFactor = 1;
 
 // ═══════════════════════════════════════════════════════════
 //  API HELPERS
@@ -1219,6 +1241,7 @@ async function openRecipe(id) {
   currentRecipe = await api("GET", `/recipes/${id}`);
   recipeIngredients = await api("GET", `/recipes/${id}/ingredients`);
   recipeSteps = await api("GET", `/recipes/${id}/steps`);
+  currentScaleFactor = 1;  // Reset scale factor when opening a recipe
   showView("viewRecipeDetail");
   renderRecipeDetail();
 }
@@ -1335,6 +1358,13 @@ function renderRecipeDetail() {
         🛒 Add to Shopping List
       </button>
     </div>
+    <div class="recipe-scale-controls" id="scaleControls">
+      <div class="recipe-scale-controls__label">Servings:</div>
+      <button class="btn btn--sm btn--ghost" id="btnDecreaseServings" title="Decrease servings">−</button>
+      <div class="recipe-scale-controls__value" id="scaledServings">${currentRecipe.servings || 4}</div>
+      <button class="btn btn--sm btn--ghost" id="btnIncreaseServings" title="Increase servings">+</button>
+      <button class="btn btn--sm btn--ghost" id="btnResetScale" style="margin-left: 8px; display: none;" title="Reset to original">↺ Reset</button>
+    </div>
     <div class="recipe-section__list" id="ingredientsList"></div>
     <div class="recipe-add-bar" id="addIngredientBar">
       <input type="text" id="newIngredientName" placeholder="Ingredient name" />
@@ -1342,7 +1372,36 @@ function renderRecipeDetail() {
       <input type="text" id="newIngredientUnit" placeholder="Unit" style="max-width:100px;" />
       <button class="btn btn--sm btn--primary">Add</button>
     </div>`;
+
   renderIngredients();
+
+  // Scale controls handlers
+  document.getElementById("btnIncreaseServings").onclick = () => {
+    const newServings = (currentRecipe.servings || 4) * currentScaleFactor + 1;
+    currentScaleFactor = newServings / (currentRecipe.servings || 4);
+    updateScaleDisplay();
+  };
+
+  document.getElementById("btnDecreaseServings").onclick = () => {
+    const currentServings = (currentRecipe.servings || 4) * currentScaleFactor;
+    if (currentServings > 1) {
+      const newServings = currentServings - 1;
+      currentScaleFactor = newServings / (currentRecipe.servings || 4);
+      updateScaleDisplay();
+    }
+  };
+
+  document.getElementById("btnResetScale").onclick = () => {
+    currentScaleFactor = 1;
+    updateScaleDisplay();
+  };
+
+  function updateScaleDisplay() {
+    const scaledServings = Math.round((currentRecipe.servings || 4) * currentScaleFactor);
+    document.getElementById("scaledServings").textContent = scaledServings;
+    document.getElementById("btnResetScale").style.display = currentScaleFactor === 1 ? 'none' : 'inline-block';
+    renderIngredients();
+  }
 
   // Add to shopping list handler
   const btnAddToShoppingList = document.getElementById("btnAddToShoppingList");
@@ -1419,6 +1478,88 @@ function renderRecipeDetail() {
   };
 }
 
+// Quantity scaling utilities
+function parseQuantity(qtyStr) {
+  if (!qtyStr || typeof qtyStr !== 'string') return null;
+  qtyStr = qtyStr.trim();
+  if (!qtyStr) return null;
+
+  // Handle ranges (e.g., "2-3")
+  if (qtyStr.includes('-')) {
+    const parts = qtyStr.split('-').map(p => parseQuantity(p.trim()));
+    if (parts[0] !== null && parts[1] !== null) {
+      return { type: 'range', min: parts[0].value, max: parts[1].value };
+    }
+  }
+
+  // Handle fractions and mixed numbers
+  // Patterns: "1/2", "1 1/2", "2.5", "2"
+  const mixedRegex = /^(\d+)\s+(\d+)\/(\d+)$/;  // "1 1/2"
+  const fractionRegex = /^(\d+)\/(\d+)$/;        // "1/2"
+  const decimalRegex = /^(\d*\.?\d+)$/;          // "2.5" or "2"
+
+  let match;
+  if ((match = qtyStr.match(mixedRegex))) {
+    const whole = parseInt(match[1]);
+    const numerator = parseInt(match[2]);
+    const denominator = parseInt(match[3]);
+    return { type: 'number', value: whole + numerator / denominator };
+  } else if ((match = qtyStr.match(fractionRegex))) {
+    const numerator = parseInt(match[1]);
+    const denominator = parseInt(match[2]);
+    return { type: 'number', value: numerator / denominator };
+  } else if ((match = qtyStr.match(decimalRegex))) {
+    return { type: 'number', value: parseFloat(match[1]) };
+  }
+
+  // If we can't parse it, return as text (e.g., "a pinch", "to taste")
+  return { type: 'text', value: qtyStr };
+}
+
+function scaleQuantity(qtyStr, scaleFactor) {
+  if (scaleFactor === 1) return qtyStr;  // No scaling needed
+
+  const parsed = parseQuantity(qtyStr);
+  if (!parsed) return qtyStr;
+
+  if (parsed.type === 'text') return qtyStr;  // Can't scale text
+
+  if (parsed.type === 'range') {
+    const scaledMin = formatQuantity(parsed.min * scaleFactor);
+    const scaledMax = formatQuantity(parsed.max * scaleFactor);
+    return `${scaledMin}-${scaledMax}`;
+  }
+
+  if (parsed.type === 'number') {
+    return formatQuantity(parsed.value * scaleFactor);
+  }
+
+  return qtyStr;
+}
+
+function formatQuantity(num) {
+  // Convert decimal to fraction if it's a common fraction
+  const commonFractions = {
+    0.125: '⅛', 0.25: '¼', 0.333: '⅓', 0.375: '⅜',
+    0.5: '½', 0.625: '⅝', 0.666: '⅔', 0.75: '¾', 0.875: '⅞'
+  };
+
+  const whole = Math.floor(num);
+  const decimal = num - whole;
+
+  // Check if decimal part matches a common fraction (with tolerance)
+  for (const [dec, frac] of Object.entries(commonFractions)) {
+    if (Math.abs(decimal - parseFloat(dec)) < 0.01) {
+      if (whole === 0) return frac;
+      return `${whole} ${frac}`;
+    }
+  }
+
+  // Round to 2 decimal places and remove trailing zeros
+  const rounded = Math.round(num * 100) / 100;
+  return rounded.toString().replace(/\.?0+$/, '');
+}
+
 function renderIngredients() {
   const list = document.getElementById("ingredientsList");
   if (!list) return;
@@ -1429,7 +1570,11 @@ function renderIngredients() {
     row.style.animationDelay = i * 0.03 + "s";
     row.draggable = true;
     row.dataset.ingredientId = ing.id;
-    const amount = [ing.quantity, ing.unit].filter(Boolean).join(" ");
+
+    // Scale the quantity based on current scale factor
+    const scaledQty = scaleQuantity(ing.quantity, currentScaleFactor || 1);
+    const amount = [scaledQty, ing.unit].filter(Boolean).join(" ");
+
     row.innerHTML = `
       <div class="recipe-ingredient-row__drag-handle" title="Drag to reorder">⋮⋮</div>
       <div class="recipe-ingredient-row__content">
