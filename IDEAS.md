@@ -115,7 +115,8 @@ This document tracks potential features, enhancements, and improvements for Cart
 ### Technical Improvements
 
 #### Frontend Architecture
-- [ ] Split index.html into modules (recipes.js, lists.js, api.js, ui.js)
+- [x] Extract CSS and JavaScript from HTML into separate files
+- [ ] Further split app.js into modules (recipes.js, lists.js, api.js, ui.js)
 - [ ] Consider lightweight framework (Alpine.js, Petite Vue)
 - [ ] Better state management
 - [ ] Component-based architecture
@@ -198,6 +199,7 @@ Have an idea not listed here? Add it! Feel free to:
 
 ## Recently Completed
 
+- ✅ Frontend refactoring: Extract CSS and JS into separate files (2026-02-01)
 - ✅ Recipe scaling with servings adjuster (2026-02-01)
 - ✅ Recipe import/export in JSON format (2026-02-01)
 - ✅ Drag-and-drop reordering for ingredients and steps (2026-02-01)
