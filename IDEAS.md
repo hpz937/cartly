@@ -182,10 +182,10 @@ This document tracks potential features, enhancements, and improvements for Cart
 
 - [ ] Base64 photos bloat database size
 - [ ] No error logging/monitoring system
-- [ ] Frontend HTML file is 1700+ lines (needs refactoring)
+- [x] Frontend HTML file is 1700+ lines (needs refactoring)
 - [ ] Some error messages too generic for users
 - [ ] No request logging for debugging
-- [ ] Git line ending warnings (need .gitattributes)
+- [x] Git line ending warnings (need .gitattributes)
 
 ---
 
