@@ -169,6 +169,17 @@ button {
 .list-card__actions { display:flex; gap:4px; }
 .list-card__actions button { padding:6px; border-radius:8px; color:var(--text-low); transition:.2s; }
 .list-card__actions button:hover { color:var(--accent); background:var(--accent-lo); }
+.list-card__badge {
+  background: var(--green);
+  color: #fff;
+  font-size: .7rem;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-left: 8px;
+}
 
 /* ─── Progress ring ─── */
 .progress-ring { width:44px; height:44px; flex-shrink:0; }
@@ -708,10 +719,14 @@ function renderLists() {
     card.innerHTML = `
       <div class="list-card__icon">🛍️</div>
       <div class="list-card__body">
-        <div class="list-card__name">${esc(list.name)}</div>
+        <div class="list-card__name">
+          ${esc(list.name)}
+          ${list.is_default ? '<span class="list-card__badge">Default</span>' : ''}
+        </div>
         <div class="list-card__meta">Created ${formatDate(list.created)}</div>
       </div>
       <div class="list-card__actions">
+        ${!list.is_default ? '<button data-action="setdefault" title="Set as default"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg></button>' : ''}
         <button data-action="rename" title="Rename"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         <button data-action="delete" title="Delete"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
       </div>`;
@@ -719,6 +734,14 @@ function renderLists() {
       if (e.target.closest("[data-action]")) return;
       openList(list.id);
     });
+    const setDefaultBtn = card.querySelector("[data-action=setdefault]");
+    if (setDefaultBtn) {
+      setDefaultBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await api("POST", `/lists/${list.id}/set-default`);
+        await loadLists();
+      });
+    }
     card.querySelector("[data-action=rename]").addEventListener("click", (e) => {
       e.stopPropagation();
       openRenameModal(list);
@@ -1256,7 +1279,12 @@ function renderRecipeDetail() {
   // Ingredients section
   const ingSection = document.getElementById("recipeIngredientsSection");
   ingSection.innerHTML = `
-    <h3 class="recipe-section__header">Ingredients</h3>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <h3 class="recipe-section__header" style="margin-bottom: 0;">Ingredients</h3>
+      <button class="btn btn--sm btn--primary" id="btnAddToShoppingList">
+        🛒 Add to Shopping List
+      </button>
+    </div>
     <div class="recipe-section__list" id="ingredientsList"></div>
     <div class="recipe-add-bar" id="addIngredientBar">
       <input type="text" id="newIngredientName" placeholder="Ingredient name" />
@@ -1265,6 +1293,38 @@ function renderRecipeDetail() {
       <button class="btn btn--sm btn--primary">Add</button>
     </div>`;
   renderIngredients();
+
+  // Add to shopping list handler
+  const btnAddToShoppingList = document.getElementById("btnAddToShoppingList");
+  if (btnAddToShoppingList) {
+    btnAddToShoppingList.onclick = async () => {
+      try {
+        const result = await api("POST", `/recipes/${currentRecipe.id}/add-to-shopping-list`);
+
+        // Show success with details
+        let message = result.message;
+        if (result.skipped.length) {
+          message += '\n\nSkipped (already in list): ' + result.skipped.join(', ');
+        }
+
+        if (confirm(message + '\n\nView shopping list now?')) {
+          await openList(result.list_id);
+        }
+
+      } catch (err) {
+        const errorMsg = err.message || "Failed to add ingredients";
+
+        if (errorMsg.includes("No default list")) {
+          if (confirm("No default shopping list set. Would you like to go to the lists page to set one?")) {
+            showView("viewLists");
+            await loadLists();
+          }
+        } else {
+          alert("Error: " + errorMsg);
+        }
+      }
+    };
+  }
 
   // Steps section
   const stepsSection = document.getElementById("recipeStepsSection");
@@ -1324,9 +1384,32 @@ function renderIngredients() {
         ${amount ? `<div class="recipe-ingredient-row__amount">${esc(amount)}</div>` : ""}
       </div>
       <div class="recipe-row__actions">
+        <button data-action="addtolist" title="Add to shopping list"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
         <button data-action="edit" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         <button data-action="delete" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
       </div>`;
+    row.querySelector("[data-action=addtolist]").onclick = async () => {
+      try {
+        const result = await api("POST", `/recipes/${currentRecipe.id}/ingredients/${ing.id}/add-to-shopping-list`);
+        if (result.skipped) {
+          alert(result.message);
+        } else {
+          if (confirm(result.message + '\n\nView shopping list now?')) {
+            await openList(result.list_id);
+          }
+        }
+      } catch (err) {
+        const errorMsg = err.message || "Failed to add ingredient";
+        if (errorMsg.includes("No default list")) {
+          if (confirm("No default shopping list set. Would you like to go to the lists page to set one?")) {
+            showView("viewLists");
+            await loadLists();
+          }
+        } else {
+          alert("Error: " + errorMsg);
+        }
+      }
+    };
     row.querySelector("[data-action=edit]").onclick = () => openEditIngredientModal(ing);
     row.querySelector("[data-action=delete]").onclick = () => openDeleteIngredientModal(ing);
     list.appendChild(row);

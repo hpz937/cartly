@@ -65,9 +65,10 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS lists (
-            id        TEXT PRIMARY KEY,
-            name      TEXT NOT NULL,
-            created   TEXT NOT NULL DEFAULT (datetime('now'))
+            id         TEXT PRIMARY KEY,
+            name       TEXT NOT NULL,
+            created    TEXT NOT NULL DEFAULT (datetime('now')),
+            is_default INTEGER NOT NULL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS categories (
             id        TEXT PRIMARY KEY,
@@ -145,6 +146,31 @@ def delete_list(list_id):
     get_db().execute("DELETE FROM lists WHERE id=?", (list_id,))
     get_db().commit()
     return jsonify({"ok": True})
+
+@app.route("/api/lists/<list_id>/set-default", methods=["POST"])
+def set_default_list(list_id):
+    """Set a list as the default shopping list. Only one list can be default at a time."""
+    db = get_db()
+
+    # Verify list exists
+    list_row = db.execute("SELECT id FROM lists WHERE id=?", (list_id,)).fetchone()
+    if not list_row:
+        return jsonify({"error": "List not found"}), 404
+
+    # Atomic operation: unset all defaults, then set the new one
+    db.execute("UPDATE lists SET is_default = 0")
+    db.execute("UPDATE lists SET is_default = 1 WHERE id=?", (list_id,))
+    db.commit()
+
+    return jsonify({"ok": True, "default_list_id": list_id})
+
+@app.route("/api/lists/default", methods=["GET"])
+def get_default_list():
+    """Get the current default shopping list."""
+    row = get_db().execute("SELECT * FROM lists WHERE is_default = 1").fetchone()
+    if row:
+        return jsonify(dict(row))
+    return jsonify({"error": "No default list set"}), 404
 
 # ---------------------------------------------------------------------------
 # Recipes CRUD
@@ -241,6 +267,152 @@ def delete_recipe_photo(recipe_id):
     )
     get_db().commit()
     return jsonify({"ok": True})
+
+@app.route("/api/recipes/<recipe_id>/add-to-shopping-list", methods=["POST"])
+def add_recipe_to_shopping_list(recipe_id):
+    """Add all ingredients from a recipe to the default shopping list.
+
+    Handles duplicate detection (case-insensitive) and quantity formatting.
+    Returns summary of added/skipped items.
+    """
+    db = get_db()
+
+    # 1. Get default list
+    default_list = db.execute("SELECT id FROM lists WHERE is_default = 1").fetchone()
+    if not default_list:
+        return jsonify({
+            "error": "No default list set",
+            "message": "Please set a default shopping list first"
+        }), 400
+
+    list_id = default_list["id"]
+
+    # 2. Get recipe ingredients
+    ingredients = db.execute(
+        "SELECT name, quantity, unit FROM recipe_ingredients WHERE recipe_id=? ORDER BY position",
+        (recipe_id,)
+    ).fetchall()
+
+    if not ingredients:
+        return jsonify({
+            "error": "No ingredients found",
+            "message": "This recipe has no ingredients to add"
+        }), 400
+
+    # 3. Get existing items for duplicate detection
+    existing_items = db.execute("SELECT name FROM items WHERE list_id=?", (list_id,)).fetchall()
+    existing_names_lower = {item["name"].lower() for item in existing_items}
+
+    # 4. Add ingredients (skip duplicates)
+    added = []
+    skipped = []
+
+    for ing in ingredients:
+        ing_name = ing["name"]
+
+        # Check for duplicate (case-insensitive)
+        if ing_name.lower() in existing_names_lower:
+            skipped.append(ing_name)
+            continue
+
+        # Format quantity: "quantity unit" or just quantity if no unit
+        quantity_parts = [ing["quantity"], ing["unit"]]
+        formatted_qty = " ".join(filter(None, quantity_parts)) or "1"
+
+        # Get next position for uncategorized items
+        pos = db.execute(
+            "SELECT COALESCE(MAX(position),0)+1 as p FROM items WHERE list_id=? AND category IS NULL",
+            (list_id,)
+        ).fetchone()["p"]
+
+        # Insert the item
+        item_id = str(uuid.uuid4())
+        db.execute(
+            "INSERT INTO items (id, list_id, category, name, quantity, note, done, position) VALUES (?,?,NULL,?,?,'',0,?)",
+            (item_id, list_id, ing_name, formatted_qty, pos)
+        )
+
+        added.append(ing_name)
+        existing_names_lower.add(ing_name.lower())  # Prevent intra-recipe duplicates
+
+    db.commit()
+
+    return jsonify({
+        "ok": True,
+        "list_id": list_id,
+        "added_count": len(added),
+        "skipped_count": len(skipped),
+        "added": added,
+        "skipped": skipped,
+        "message": f"Added {len(added)} ingredient(s) to your shopping list" +
+                   (f" ({len(skipped)} duplicate(s) skipped)" if skipped else "")
+    })
+
+@app.route("/api/recipes/<recipe_id>/ingredients/<ingredient_id>/add-to-shopping-list", methods=["POST"])
+def add_ingredient_to_shopping_list(recipe_id, ingredient_id):
+    """Add a single ingredient from a recipe to the default shopping list.
+
+    Handles duplicate detection (case-insensitive) and quantity formatting.
+    """
+    db = get_db()
+
+    # 1. Get default list
+    default_list = db.execute("SELECT id FROM lists WHERE is_default = 1").fetchone()
+    if not default_list:
+        return jsonify({
+            "error": "No default list set",
+            "message": "Please set a default shopping list first"
+        }), 400
+
+    list_id = default_list["id"]
+
+    # 2. Get the specific ingredient
+    ingredient = db.execute(
+        "SELECT name, quantity, unit FROM recipe_ingredients WHERE id=? AND recipe_id=?",
+        (ingredient_id, recipe_id)
+    ).fetchone()
+
+    if not ingredient:
+        return jsonify({
+            "error": "Ingredient not found"
+        }), 404
+
+    # 3. Check for duplicate (case-insensitive)
+    existing_items = db.execute("SELECT name FROM items WHERE list_id=?", (list_id,)).fetchall()
+    existing_names_lower = {item["name"].lower() for item in existing_items}
+
+    ing_name = ingredient["name"]
+
+    if ing_name.lower() in existing_names_lower:
+        return jsonify({
+            "ok": False,
+            "skipped": True,
+            "message": f"'{ing_name}' is already in your shopping list"
+        })
+
+    # 4. Format quantity and add to list
+    quantity_parts = [ingredient["quantity"], ingredient["unit"]]
+    formatted_qty = " ".join(filter(None, quantity_parts)) or "1"
+
+    # Get next position for uncategorized items
+    pos = db.execute(
+        "SELECT COALESCE(MAX(position),0)+1 as p FROM items WHERE list_id=? AND category IS NULL",
+        (list_id,)
+    ).fetchone()["p"]
+
+    # Insert the item
+    item_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT INTO items (id, list_id, category, name, quantity, note, done, position) VALUES (?,?,NULL,?,?,'',0,?)",
+        (item_id, list_id, ing_name, formatted_qty, pos)
+    )
+    db.commit()
+
+    return jsonify({
+        "ok": True,
+        "list_id": list_id,
+        "message": f"Added '{ing_name}' to your shopping list"
+    })
 
 # ---------------------------------------------------------------------------
 # Recipe Ingredients CRUD

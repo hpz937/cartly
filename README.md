@@ -42,6 +42,9 @@ docker compose down
 - **Clear done** — remove all completed items in one tap
 - **Edit items** — change name, quantity, note, or category
 - **Recipes** — create and manage recipes with ingredients, step-by-step instructions, and photos
+- **Default list** — mark one list as your default for quick recipe-to-list workflows
+- **Recipe-to-list** — add all ingredients from a recipe to your default shopping list in one tap
+- **Smart duplicate detection** — automatically skips items already in your list (case-insensitive)
 - **Persistent data** — everything survives container restarts (Docker volume)
 
 ## Testing
@@ -99,6 +102,19 @@ This adds 3 sample recipes:
 
 ### Database Migrations
 
+**For the default list feature:**
+
+If you're upgrading from an earlier version without the `is_default` column:
+
+```bash
+docker compose cp backend/migrate_add_default.py backend:/app/
+docker compose exec backend python migrate_add_default.py
+```
+
+This safely adds the `is_default` column to the lists table without losing data. If you have exactly one list, it will automatically be set as the default.
+
+**For the photo feature:**
+
 If you're upgrading from an earlier version without the photo column:
 
 ```bash
@@ -118,6 +134,8 @@ This safely adds the `photo` column to existing recipes without losing data.
 | POST   | `/api/lists`                              | Create a list               |
 | PUT    | `/api/lists/:id`                          | Rename a list               |
 | DELETE | `/api/lists/:id`                          | Delete a list               |
+| POST   | `/api/lists/:id/set-default`              | Set list as default         |
+| GET    | `/api/lists/default`                      | Get the default list        |
 | GET    | `/api/lists/:id/categories`               | Get categories              |
 | POST   | `/api/lists/:id/categories`               | Create a category           |
 | PUT    | `/api/lists/:id/categories/:cid`          | Rename a category           |
@@ -148,3 +166,4 @@ This safely adds the `photo` column to existing recipes without losing data.
 | DELETE | `/api/recipes/:id/steps/:sid`             | Delete a step               |
 | PUT    | `/api/recipes/:id/photo`                  | Upload a recipe photo       |
 | DELETE | `/api/recipes/:id/photo`                  | Delete a recipe photo       |
+| POST   | `/api/recipes/:id/add-to-shopping-list`   | Add ingredients to default list |
