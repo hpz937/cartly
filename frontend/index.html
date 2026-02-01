@@ -431,11 +431,36 @@ button {
   padding: 12px 14px;
   transition: all .2s;
   animation: slideUp .25s ease both;
+  cursor: move;
 }
 .recipe-ingredient-row:hover,
 .recipe-step-row:hover {
   border-color: var(--accent-lo);
   box-shadow: 0 2px 8px rgba(44,36,32,.06);
+}
+.recipe-ingredient-row.dragging,
+.recipe-step-row.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+.recipe-ingredient-row.drag-over,
+.recipe-step-row.drag-over {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: var(--accent-lo);
+}
+.recipe-ingredient-row__drag-handle,
+.recipe-step-row__drag-handle {
+  color: var(--text-low);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: grab;
+  user-select: none;
+  padding: 0 2px;
+}
+.recipe-ingredient-row__drag-handle:active,
+.recipe-step-row__drag-handle:active {
+  cursor: grabbing;
 }
 .recipe-ingredient-row__content {
   flex: 1;
@@ -605,7 +630,12 @@ button {
 <section class="view" id="viewRecipes">
   <div class="lists-header">
     <h1>Your <em>recipes</em></h1>
-    <button class="btn btn--primary" id="btnNewRecipe">+ New recipe</button>
+    <div style="display: flex; gap: 8px;">
+      <input type="file" id="importRecipeFile" accept=".json" style="display:none;" />
+      <button class="btn btn--ghost" id="btnImportRecipes">📥 Import</button>
+      <button class="btn btn--ghost" id="btnExportAllRecipes">📤 Export All</button>
+      <button class="btn btn--primary" id="btnNewRecipe">+ New recipe</button>
+    </div>
   </div>
   <div class="lists-grid" id="recipesGrid">
     <div class="empty-state" id="recipesEmpty">
@@ -1213,7 +1243,22 @@ function renderRecipeDetail() {
   // Top actions
   const topActions = document.getElementById("recipeTopActions");
   topActions.innerHTML = `
+    <button class="btn btn--sm btn--ghost" id="btnExportRecipe">📤 Export</button>
     <button class="btn btn--sm btn--danger" id="btnDeleteRecipe">Delete</button>`;
+  document.getElementById("btnExportRecipe").onclick = async () => {
+    try {
+      const data = await api("GET", `/recipes/${currentRecipe.id}/export`);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentRecipe.name.replace(/[^a-z0-9]/gi, '_')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Error exporting recipe: " + err.message);
+    }
+  };
   document.getElementById("btnDeleteRecipe").onclick = () => openDeleteRecipeModal(currentRecipe);
 
   // Recipe photo
@@ -1244,6 +1289,10 @@ function renderRecipeDetail() {
       <div class="recipe-meta__label">Description</div>
       <textarea class="recipe-meta__input" id="recipeDescription" rows="2" placeholder="Brief description of the recipe">${esc(currentRecipe.description || "")}</textarea>
     </div>
+    <div class="recipe-meta__field">
+      <div class="recipe-meta__label">Notes</div>
+      <textarea class="recipe-meta__input" id="recipeNotes" rows="3" placeholder="Tips, variations, serving suggestions, etc.">${esc(currentRecipe.notes || "")}</textarea>
+    </div>
     <div class="recipe-meta__row">
       <div class="recipe-meta__field">
         <div class="recipe-meta__label">Servings</div>
@@ -1260,11 +1309,12 @@ function renderRecipeDetail() {
     </div>`;
 
   // Auto-save metadata changes
-  ["recipeDescription", "recipeServings", "recipePrepTime", "recipeCookTime"].forEach(id => {
+  ["recipeDescription", "recipeNotes", "recipeServings", "recipePrepTime", "recipeCookTime"].forEach(id => {
     const el = document.getElementById(id);
     el.onblur = async () => {
       const updates = {
         description: document.getElementById("recipeDescription").value.trim(),
+        notes: document.getElementById("recipeNotes").value.trim(),
         servings: parseInt(document.getElementById("recipeServings").value) || 4,
         prep_time: document.getElementById("recipePrepTime").value.trim(),
         cook_time: document.getElementById("recipeCookTime").value.trim()
@@ -1377,8 +1427,11 @@ function renderIngredients() {
     const row = document.createElement("div");
     row.className = "recipe-ingredient-row";
     row.style.animationDelay = i * 0.03 + "s";
+    row.draggable = true;
+    row.dataset.ingredientId = ing.id;
     const amount = [ing.quantity, ing.unit].filter(Boolean).join(" ");
     row.innerHTML = `
+      <div class="recipe-ingredient-row__drag-handle" title="Drag to reorder">⋮⋮</div>
       <div class="recipe-ingredient-row__content">
         <div class="recipe-ingredient-row__name">${esc(ing.name)}</div>
         ${amount ? `<div class="recipe-ingredient-row__amount">${esc(amount)}</div>` : ""}
@@ -1388,6 +1441,61 @@ function renderIngredients() {
         <button data-action="edit" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         <button data-action="delete" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
       </div>`;
+
+    // Drag and drop handlers
+    row.addEventListener('dragstart', (e) => {
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', row.innerHTML);
+    });
+
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      document.querySelectorAll('.recipe-ingredient-row').forEach(r => r.classList.remove('drag-over'));
+    });
+
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const dragging = document.querySelector('.dragging');
+      if (dragging && dragging !== row) {
+        row.classList.add('drag-over');
+      }
+    });
+
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drag-over');
+    });
+
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      row.classList.remove('drag-over');
+      const dragging = document.querySelector('.dragging');
+      if (!dragging || dragging === row) return;
+
+      // Reorder in DOM
+      const allRows = [...list.querySelectorAll('.recipe-ingredient-row')];
+      const dragIndex = allRows.indexOf(dragging);
+      const dropIndex = allRows.indexOf(row);
+
+      if (dragIndex < dropIndex) {
+        row.after(dragging);
+      } else {
+        row.before(dragging);
+      }
+
+      // Update backend
+      const newOrder = [...list.querySelectorAll('.recipe-ingredient-row')].map(r => r.dataset.ingredientId);
+      try {
+        await api("PUT", `/recipes/${currentRecipe.id}/ingredients/reorder`, { ingredient_ids: newOrder });
+        // Reload to sync positions
+        recipeIngredients = await api("GET", `/recipes/${currentRecipe.id}/ingredients`);
+        renderIngredients();
+      } catch (err) {
+        alert("Error reordering: " + err.message);
+        renderIngredients(); // Revert on error
+      }
+    });
     row.querySelector("[data-action=addtolist]").onclick = async () => {
       try {
         const result = await api("POST", `/recipes/${currentRecipe.id}/ingredients/${ing.id}/add-to-shopping-list`);
@@ -1424,13 +1532,72 @@ function renderSteps() {
     const row = document.createElement("div");
     row.className = "recipe-step-row";
     row.style.animationDelay = i * 0.03 + "s";
+    row.draggable = true;
+    row.dataset.stepId = step.id;
     row.innerHTML = `
+      <div class="recipe-step-row__drag-handle" title="Drag to reorder">⋮⋮</div>
       <div class="recipe-step-row__number">${step.step_number}</div>
       <div class="recipe-step-row__text">${esc(step.instruction)}</div>
       <div class="recipe-row__actions">
         <button data-action="edit" title="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         <button data-action="delete" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
       </div>`;
+
+    // Drag and drop handlers
+    row.addEventListener('dragstart', (e) => {
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', row.innerHTML);
+    });
+
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      document.querySelectorAll('.recipe-step-row').forEach(r => r.classList.remove('drag-over'));
+    });
+
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const dragging = document.querySelector('.dragging');
+      if (dragging && dragging !== row) {
+        row.classList.add('drag-over');
+      }
+    });
+
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drag-over');
+    });
+
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      row.classList.remove('drag-over');
+      const dragging = document.querySelector('.dragging');
+      if (!dragging || dragging === row) return;
+
+      // Reorder in DOM
+      const allRows = [...list.querySelectorAll('.recipe-step-row')];
+      const dragIndex = allRows.indexOf(dragging);
+      const dropIndex = allRows.indexOf(row);
+
+      if (dragIndex < dropIndex) {
+        row.after(dragging);
+      } else {
+        row.before(dragging);
+      }
+
+      // Update backend
+      const newOrder = [...list.querySelectorAll('.recipe-step-row')].map(r => r.dataset.stepId);
+      try {
+        await api("PUT", `/recipes/${currentRecipe.id}/steps/reorder`, { step_ids: newOrder });
+        // Reload to sync step numbers
+        recipeSteps = await api("GET", `/recipes/${currentRecipe.id}/steps`);
+        renderSteps();
+      } catch (err) {
+        alert("Error reordering: " + err.message);
+        renderSteps(); // Revert on error
+      }
+    });
+
     row.querySelector("[data-action=edit]").onclick = () => openEditStepModal(step);
     row.querySelector("[data-action=delete]").onclick = () => openDeleteStepModal(step);
     list.appendChild(row);
@@ -1518,6 +1685,47 @@ document.getElementById("btnNewRecipe").addEventListener("click", () => {
     }}
   ]);
   setTimeout(() => document.getElementById("modalNewRecipeName").focus(), 50);
+});
+
+document.getElementById("btnExportAllRecipes").addEventListener("click", async () => {
+  try {
+    const data = await api("GET", "/recipes/export");
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `recipes_export_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert("Error exporting recipes: " + err.message);
+  }
+});
+
+document.getElementById("btnImportRecipes").addEventListener("click", () => {
+  document.getElementById("importRecipeFile").click();
+});
+
+document.getElementById("importRecipeFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const result = await api("POST", "/recipes/import", data);
+
+    alert(result.message + '\n\nImported: ' + result.imported.join(', '));
+
+    // Reload recipes
+    await loadRecipes();
+
+    // Clear file input
+    e.target.value = '';
+  } catch (err) {
+    alert("Error importing recipes: " + err.message);
+    e.target.value = '';
+  }
 });
 
 document.getElementById("btnBackRecipe").addEventListener("click", () => {

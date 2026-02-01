@@ -92,6 +92,7 @@ def init_db():
             id          TEXT PRIMARY KEY,
             name        TEXT NOT NULL,
             description TEXT DEFAULT '',
+            notes       TEXT DEFAULT '',
             servings    INTEGER DEFAULT 4,
             prep_time   TEXT DEFAULT '',
             cook_time   TEXT DEFAULT '',
@@ -205,7 +206,7 @@ def update_recipe(recipe_id):
     db = get_db()
     sets = []
     vals = []
-    for k in ("name", "description", "servings", "prep_time", "cook_time"):
+    for k in ("name", "description", "notes", "servings", "prep_time", "cook_time"):
         if k in data:
             sets.append(f"{k}=?")
             vals.append(data[k])
@@ -460,6 +461,26 @@ def delete_recipe_ingredient(recipe_id, ing_id):
     get_db().commit()
     return jsonify({"ok": True})
 
+@app.route("/api/recipes/<recipe_id>/ingredients/reorder", methods=["PUT"])
+def reorder_recipe_ingredients(recipe_id):
+    """Reorder ingredients based on array of ingredient IDs."""
+    data = request.get_json()
+    ingredient_ids = data.get("ingredient_ids", [])
+
+    if not ingredient_ids:
+        return jsonify({"error": "No ingredient IDs provided"}), 400
+
+    db = get_db()
+    # Update positions based on order in array
+    for idx, ing_id in enumerate(ingredient_ids, 1):
+        db.execute(
+            "UPDATE recipe_ingredients SET position=? WHERE id=? AND recipe_id=?",
+            (idx, ing_id, recipe_id)
+        )
+    db.commit()
+
+    return jsonify({"ok": True})
+
 # ---------------------------------------------------------------------------
 # Recipe Steps CRUD
 # ---------------------------------------------------------------------------
@@ -511,6 +532,183 @@ def delete_recipe_step(recipe_id, step_id):
         )
     db.commit()
     return jsonify({"ok": True})
+
+@app.route("/api/recipes/<recipe_id>/steps/reorder", methods=["PUT"])
+def reorder_recipe_steps(recipe_id):
+    """Reorder steps based on array of step IDs."""
+    data = request.get_json()
+    step_ids = data.get("step_ids", [])
+
+    if not step_ids:
+        return jsonify({"error": "No step IDs provided"}), 400
+
+    db = get_db()
+    # Update step numbers based on order in array
+    for idx, step_id in enumerate(step_ids, 1):
+        db.execute(
+            "UPDATE recipe_steps SET step_number=? WHERE id=? AND recipe_id=?",
+            (idx, step_id, recipe_id)
+        )
+    db.commit()
+
+    return jsonify({"ok": True})
+
+# ---------------------------------------------------------------------------
+# Recipe Import/Export
+# ---------------------------------------------------------------------------
+@app.route("/api/recipes/<recipe_id>/export", methods=["GET"])
+def export_recipe(recipe_id):
+    """Export a single recipe as JSON with all ingredients and steps."""
+    db = get_db()
+
+    # Get recipe
+    recipe = db.execute("SELECT * FROM recipes WHERE id=?", (recipe_id,)).fetchone()
+    if not recipe:
+        return jsonify({"error": "Recipe not found"}), 404
+
+    # Get ingredients
+    ingredients = db.execute(
+        "SELECT name, quantity, unit, position FROM recipe_ingredients WHERE recipe_id=? ORDER BY position",
+        (recipe_id,)
+    ).fetchall()
+
+    # Get steps
+    steps = db.execute(
+        "SELECT step_number, instruction FROM recipe_steps WHERE recipe_id=? ORDER BY step_number",
+        (recipe_id,)
+    ).fetchall()
+
+    # Build export data
+    export_data = {
+        "name": recipe["name"],
+        "description": recipe["description"],
+        "notes": recipe["notes"],
+        "servings": recipe["servings"],
+        "prep_time": recipe["prep_time"],
+        "cook_time": recipe["cook_time"],
+        "photo": recipe["photo"],
+        "ingredients": [dict(ing) for ing in ingredients],
+        "steps": [dict(step) for step in steps]
+    }
+
+    return jsonify(export_data)
+
+@app.route("/api/recipes/export", methods=["GET"])
+def export_all_recipes():
+    """Export all recipes as JSON array."""
+    db = get_db()
+
+    # Get all recipes
+    recipes = db.execute("SELECT * FROM recipes ORDER BY created DESC").fetchall()
+
+    export_data = []
+    for recipe in recipes:
+        recipe_id = recipe["id"]
+
+        # Get ingredients
+        ingredients = db.execute(
+            "SELECT name, quantity, unit, position FROM recipe_ingredients WHERE recipe_id=? ORDER BY position",
+            (recipe_id,)
+        ).fetchall()
+
+        # Get steps
+        steps = db.execute(
+            "SELECT step_number, instruction FROM recipe_steps WHERE recipe_id=? ORDER BY step_number",
+            (recipe_id,)
+        ).fetchall()
+
+        export_data.append({
+            "name": recipe["name"],
+            "description": recipe["description"],
+            "notes": recipe["notes"],
+            "servings": recipe["servings"],
+            "prep_time": recipe["prep_time"],
+            "cook_time": recipe["cook_time"],
+            "photo": recipe["photo"],
+            "ingredients": [dict(ing) for ing in ingredients],
+            "steps": [dict(step) for step in steps]
+        })
+
+    return jsonify(export_data)
+
+@app.route("/api/recipes/import", methods=["POST"])
+def import_recipes():
+    """Import recipe(s) from JSON. Accepts single recipe object or array of recipes."""
+    data = request.get_json()
+
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    # Handle both single recipe and array of recipes
+    recipes_to_import = data if isinstance(data, list) else [data]
+
+    db = get_db()
+    imported_count = 0
+    imported_names = []
+
+    for recipe_data in recipes_to_import:
+        # Validate required fields
+        if not recipe_data.get("name"):
+            continue
+
+        # Create recipe
+        recipe_id = str(uuid.uuid4())
+        db.execute(
+            """INSERT INTO recipes (id, name, description, notes, servings, prep_time, cook_time, photo, created)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+            (
+                recipe_id,
+                recipe_data["name"],
+                recipe_data.get("description", ""),
+                recipe_data.get("notes", ""),
+                recipe_data.get("servings", 4),
+                recipe_data.get("prep_time", ""),
+                recipe_data.get("cook_time", ""),
+                recipe_data.get("photo")
+            )
+        )
+
+        # Import ingredients
+        for idx, ing in enumerate(recipe_data.get("ingredients", []), 1):
+            ing_id = str(uuid.uuid4())
+            db.execute(
+                """INSERT INTO recipe_ingredients (id, recipe_id, name, quantity, unit, position)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    ing_id,
+                    recipe_id,
+                    ing["name"],
+                    ing.get("quantity", ""),
+                    ing.get("unit", ""),
+                    ing.get("position", idx)
+                )
+            )
+
+        # Import steps
+        for idx, step in enumerate(recipe_data.get("steps", []), 1):
+            step_id = str(uuid.uuid4())
+            db.execute(
+                """INSERT INTO recipe_steps (id, recipe_id, step_number, instruction)
+                   VALUES (?, ?, ?, ?)""",
+                (
+                    step_id,
+                    recipe_id,
+                    step.get("step_number", idx),
+                    step["instruction"]
+                )
+            )
+
+        imported_count += 1
+        imported_names.append(recipe_data["name"])
+
+    db.commit()
+
+    return jsonify({
+        "ok": True,
+        "imported_count": imported_count,
+        "imported": imported_names,
+        "message": f"Successfully imported {imported_count} recipe(s)"
+    })
 
 # ---------------------------------------------------------------------------
 # Categories CRUD
