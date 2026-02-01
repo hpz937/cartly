@@ -1555,9 +1555,11 @@ function formatQuantity(num) {
     }
   }
 
-  // Round to 2 decimal places and remove trailing zeros
+  // Round to 2 decimal places and remove trailing zeros after decimal point only
   const rounded = Math.round(num * 100) / 100;
-  return rounded.toString().replace(/\.?0+$/, '');
+  const str = rounded.toString();
+  // Only remove trailing zeros if there's a decimal point (e.g., "2.50" → "2.5", but keep "500" as "500")
+  return str.includes('.') ? str.replace(/\.?0+$/, '') : str;
 }
 
 function renderIngredients() {
