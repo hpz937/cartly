@@ -1,102 +1,1809 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Cartly — Shopping Lists</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/styles.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cartly — Shopping & Recipes</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#fef2f2',
+              100: '#fee2e2',
+              200: '#fecaca',
+              300: '#fca5a5',
+              400: '#f87171',
+              500: '#ef4444',
+              600: '#dc2626',
+              700: '#b91c1c',
+              800: '#991b1b',
+              900: '#7f1d1d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- Custom Styles -->
+  <style>
+    [x-cloak] { display: none !important; }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .ingredient-add-btn {
+      opacity: 0.3;
+      transition: opacity 0.2s;
+    }
+    .ingredient-add-btn:hover {
+      opacity: 1;
+    }
+  </style>
 </head>
-<body>
+<body class="bg-gray-900 text-gray-100 min-h-screen" x-data="app()" x-cloak>
 
-<!-- ─── TOP BAR ─── -->
-<header class="topbar">
-  <div class="topbar__logo">Cart<em>ly</em></div>
-  <div class="topbar__actions" id="topbarActions"></div>
-</header>
+  <!-- Navigation -->
+  <nav class="bg-gray-800 border-b border-gray-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between items-center h-16">
+        <!-- Logo -->
+        <div class="flex items-center space-x-8">
+          <h1 class="text-2xl font-bold cursor-pointer" @click="currentView = 'recipes'; currentRecipe = null; currentList = null">
+            <span class="text-white">Cart</span><span class="text-primary-500 italic">ly</span>
+          </h1>
 
-<!-- ─── LISTS VIEW ─── -->
-<section class="view view--active" id="viewLists">
-  <div class="lists-header">
-    <h1>Your <em>lists</em></h1>
-    <button class="btn btn--primary" id="btnNewList">+ New list</button>
-  </div>
-  <div class="lists-grid" id="listsGrid">
-    <div class="empty-state" id="listsEmpty">
-      <div class="empty-state__icon">🛒</div>
-      <p>No lists yet. Create one to start shopping!</p>
+          <!-- Navigation Links -->
+          <div class="hidden md:flex space-x-1">
+            <button
+              @click="currentView = 'recipes'; currentRecipe = null; currentList = null"
+              :class="currentView === 'recipes' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'"
+              class="px-3 py-2 rounded-md text-sm font-medium transition-colors">
+              📖 Recipes
+            </button>
+            <button
+              @click="currentView = 'lists'; currentRecipe = null; currentList = null"
+              :class="currentView === 'lists' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'"
+              class="px-3 py-2 rounded-md text-sm font-medium transition-colors">
+              🛒 Shopping Lists
+            </button>
+          </div>
+        </div>
+
+        <!-- Mobile menu button -->
+        <div class="md:hidden">
+          <button
+            @click="mobileMenuOpen = !mobileMenuOpen"
+            class="text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 p-2 rounded-md">
+            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path :class="{'hidden': mobileMenuOpen, 'inline-flex': !mobileMenuOpen }" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+              <path :class="{'hidden': !mobileMenuOpen, 'inline-flex': mobileMenuOpen }" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile menu -->
+    <div x-show="mobileMenuOpen" x-transition class="md:hidden border-t border-gray-700">
+      <div class="px-2 pt-2 pb-3 space-y-1">
+        <button
+          @click="currentView = 'recipes'; currentRecipe = null; currentList = null; mobileMenuOpen = false"
+          :class="currentView === 'recipes' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'"
+          class="block w-full text-left px-3 py-2 rounded-md text-base font-medium transition-colors">
+          📖 Recipes
+        </button>
+        <button
+          @click="currentView = 'lists'; currentRecipe = null; currentList = null; mobileMenuOpen = false"
+          :class="currentView === 'lists' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'"
+          class="block w-full text-left px-3 py-2 rounded-md text-base font-medium transition-colors">
+          🛒 Shopping Lists
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Recipes List View -->
+    <div x-show="currentView === 'recipes' && !currentRecipe" x-transition>
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+        <div>
+          <h2 class="text-3xl font-bold text-white">Your <span class="text-primary-500 italic">Recipes</span></h2>
+          <p class="text-gray-400 mt-1">Manage and organize your favorite recipes</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            @click="openImportDialog"
+            class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Import
+          </button>
+          <button
+            @click="exportAllRecipes"
+            class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            Export All
+          </button>
+          <button
+            @click="createRecipe"
+            class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            New Recipe
+          </button>
+        </div>
+      </div>
+
+      <!-- Search and Sort -->
+      <div x-show="recipes.length > 0" class="mb-6 flex flex-col sm:flex-row gap-4">
+        <!-- Search Bar -->
+        <div class="flex-1 relative">
+          <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            x-model="searchQuery"
+            type="text"
+            placeholder="Search recipes..."
+            class="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+        </div>
+
+        <!-- Sort Dropdown -->
+        <select
+          x-model="sortBy"
+          class="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+          <option value="name-asc">Name (A-Z)</option>
+          <option value="name-desc">Name (Z-A)</option>
+          <option value="date-desc">Newest First</option>
+          <option value="date-asc">Oldest First</option>
+        </select>
+      </div>
+
+      <!-- Empty State -->
+      <div x-show="recipes.length === 0" class="text-center py-16">
+        <div class="text-6xl mb-4">📖</div>
+        <h3 class="text-xl font-semibold text-gray-300 mb-2">No recipes yet</h3>
+        <p class="text-gray-500">Create your first recipe to get cooking!</p>
+      </div>
+
+      <!-- No Results -->
+      <div x-show="recipes.length > 0 && filteredRecipes.length === 0" class="text-center py-16">
+        <div class="text-6xl mb-4">🔍</div>
+        <h3 class="text-xl font-semibold text-gray-300 mb-2">No recipes found</h3>
+        <p class="text-gray-500">Try adjusting your search</p>
+      </div>
+
+      <!-- Recipes Grid -->
+      <div x-show="filteredRecipes.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <template x-for="recipe in filteredRecipes" :key="recipe.id">
+          <div
+            @click="openRecipe(recipe.id)"
+            class="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-primary-500 transition-all cursor-pointer group">
+            <!-- Recipe Photo -->
+            <div class="aspect-video bg-gray-700 relative overflow-hidden">
+              <template x-if="recipe.photo">
+                <img :src="recipe.photo" :alt="recipe.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+              </template>
+              <template x-if="!recipe.photo">
+                <div class="w-full h-full flex items-center justify-center text-gray-600">
+                  <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                  </svg>
+                </div>
+              </template>
+            </div>
+
+            <!-- Recipe Info -->
+            <div class="p-5">
+              <h3 class="text-lg font-semibold text-white mb-2 group-hover:text-primary-500 transition-colors" x-text="recipe.name"></h3>
+              <p x-show="recipe.description" class="text-gray-400 text-sm mb-4 line-clamp-2" x-text="recipe.description"></p>
+
+              <div class="flex items-center gap-4 text-sm text-gray-500">
+                <div x-show="recipe.servings" class="flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span x-text="recipe.servings"></span>
+                </div>
+                <div x-show="recipe.prep_time" class="flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span x-text="recipe.prep_time"></span>
+                </div>
+                <div x-show="recipe.cook_time" class="flex items-center gap-1">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                  </svg>
+                  <span x-text="recipe.cook_time"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Recipe Detail View -->
+    <div x-show="currentView === 'recipes' && currentRecipe" x-transition>
+      <template x-if="currentRecipe">
+        <div>
+          <!-- Back Button & Actions -->
+          <div class="flex justify-between items-center mb-6">
+            <button
+              @click="currentRecipe = null; scaleFactor = 1"
+              class="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              </svg>
+              Back to recipes
+            </button>
+            <div class="flex gap-2">
+              <button
+                @click="exportRecipe(currentRecipe.id)"
+                class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors">
+                Export
+              </button>
+              <button
+                @click="editRecipe(currentRecipe.id)"
+                class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors">
+                Edit
+              </button>
+              <button
+                @click="deleteRecipe(currentRecipe.id)"
+                class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                Delete
+              </button>
+            </div>
+          </div>
+
+          <!-- Recipe Header -->
+          <div class="bg-gray-800 rounded-xl border border-gray-700 mb-6 overflow-hidden">
+            <div class="flex flex-col md:flex-row">
+              <!-- Recipe Info -->
+              <div class="flex-1 p-6">
+                <h1 class="text-3xl font-bold text-white mb-3" x-text="currentRecipe.name"></h1>
+                <p x-show="currentRecipe.description" class="text-gray-400 mb-4" x-text="currentRecipe.description"></p>
+                <p x-show="currentRecipe.notes" class="text-gray-500 text-sm italic mb-4" x-text="currentRecipe.notes"></p>
+
+                <div class="flex flex-wrap gap-4 text-sm">
+                  <div x-show="currentRecipe.servings" class="flex items-center gap-2 text-gray-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span>Servings: <span x-text="currentRecipe.servings"></span></span>
+                  </div>
+                  <div x-show="currentRecipe.prep_time" class="flex items-center gap-2 text-gray-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Prep: <span x-text="currentRecipe.prep_time"></span></span>
+                  </div>
+                  <div x-show="currentRecipe.cook_time" class="flex items-center gap-2 text-gray-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                    </svg>
+                    <span>Cook: <span x-text="currentRecipe.cook_time"></span></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Recipe Photo -->
+              <template x-if="currentRecipe.photo">
+                <div class="w-full md:w-80 flex-shrink-0">
+                  <img :src="currentRecipe.photo" :alt="currentRecipe.name" class="w-full h-full object-cover">
+                </div>
+              </template>
+              <template x-if="!currentRecipe.photo">
+                <div class="w-full md:w-80 flex-shrink-0 bg-gray-700 flex items-center justify-center">
+                  <svg class="w-16 h-16 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Ingredients with Scaling -->
+          <div class="bg-gray-800 rounded-xl border border-gray-700 p-6 mb-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+              <h2 class="text-2xl font-bold text-white">Ingredients</h2>
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center gap-3 bg-gray-700 rounded-lg p-2">
+                  <span class="text-sm text-gray-400">Servings:</span>
+                  <button
+                    @click="decreaseServings"
+                    class="w-8 h-8 flex items-center justify-center bg-gray-600 hover:bg-gray-500 rounded text-white transition-colors">
+                    −
+                  </button>
+                  <span class="w-8 text-center font-semibold text-primary-500" x-text="scaledServings"></span>
+                  <button
+                    @click="increaseServings"
+                    class="w-8 h-8 flex items-center justify-center bg-gray-600 hover:bg-gray-500 rounded text-white transition-colors">
+                    +
+                  </button>
+                  <button
+                    x-show="scaleFactor !== 1"
+                    @click="resetScale"
+                    class="ml-2 px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm text-white transition-colors">
+                    Reset
+                  </button>
+                </div>
+                <button
+                  @click="addToShoppingList"
+                  class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  Add to List
+                </button>
+              </div>
+            </div>
+            <ul class="space-y-1">
+              <template x-for="ingredient in ingredients" :key="ingredient.id">
+                <li class="ingredient-item flex items-center justify-between gap-3 text-gray-300 py-2 px-3 rounded-lg hover:bg-gray-700 transition-colors">
+                  <div class="flex items-start gap-3">
+                    <span class="text-primary-500 mt-1">•</span>
+                    <span>
+                      <span x-show="ingredient.quantity" class="font-semibold text-white" x-text="scaleQuantity(ingredient.quantity)"></span>
+                      <span x-show="ingredient.unit" x-text="' ' + ingredient.unit"></span>
+                      <span x-text="' ' + ingredient.name"></span>
+                    </span>
+                  </div>
+                  <button
+                    @click="addIngredientToList(ingredient, $event)"
+                    class="ingredient-add-btn flex-shrink-0 w-7 h-7 flex items-center justify-center bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
+                    title="Add to shopping list">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </button>
+                </li>
+              </template>
+            </ul>
+            <div x-show="ingredients.length === 0" class="text-center py-8 text-gray-500">
+              No ingredients yet
+            </div>
+          </div>
+
+          <!-- Instructions -->
+          <div class="bg-gray-800 rounded-xl border border-gray-700 p-6">
+            <h2 class="text-2xl font-bold text-white mb-4">Instructions</h2>
+            <ol class="space-y-4">
+              <template x-for="(step, index) in steps" :key="step.id">
+                <li class="flex gap-4">
+                  <div class="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold" x-text="index + 1"></div>
+                  <p class="text-gray-300 pt-1" x-text="step.instruction"></p>
+                </li>
+              </template>
+            </ol>
+            <div x-show="steps.length === 0" class="text-center py-8 text-gray-500">
+              No instructions yet
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Shopping Lists View (Placeholder) -->
+    <!-- Shopping Lists View -->
+    <div x-show="currentView === 'lists'" x-transition>
+
+      <!-- List Selection View -->
+      <div x-show="!currentList">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div>
+            <h2 class="text-3xl font-bold text-white">Your <span class="text-primary-500 italic">Shopping Lists</span></h2>
+            <p class="text-gray-400 mt-1">Manage your shopping lists</p>
+          </div>
+          <button
+            @click="createList"
+            class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            New List
+          </button>
+        </div>
+
+        <!-- Empty State -->
+        <div x-show="lists.length === 0" class="text-center py-16">
+          <div class="text-6xl mb-4">🛒</div>
+          <h3 class="text-xl font-semibold text-gray-300 mb-2">No lists yet</h3>
+          <p class="text-gray-500">Create your first shopping list to get started</p>
+        </div>
+
+        <!-- Lists Grid -->
+        <div x-show="lists.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <template x-for="list in lists" :key="list.id">
+            <div class="bg-gray-800 rounded-xl border border-gray-700 hover:border-primary-500 transition-all p-6 group">
+              <div class="flex items-start justify-between mb-4">
+                <div @click="openList(list.id)" class="cursor-pointer flex-1">
+                  <h3 class="text-xl font-semibold text-white group-hover:text-primary-500 transition-colors flex items-center gap-2">
+                    <span x-text="list.name"></span>
+                    <span x-show="list.is_default" class="text-xs bg-primary-600 text-white px-2 py-1 rounded-full">Default</span>
+                  </h3>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button
+                    @click.stop="renameList(list)"
+                    class="p-2 text-gray-400 hover:text-white transition-colors"
+                    title="Rename list">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button
+                    @click.stop="deleteList(list.id)"
+                    class="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Delete list">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div @click="openList(list.id)" class="cursor-pointer">
+                <p class="text-gray-400 text-sm" x-text="list.itemCount ? `${list.itemCount} item${list.itemCount !== 1 ? 's' : ''}` : 'No items'"></p>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- List Detail View -->
+      <div x-show="currentList">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div class="flex items-center gap-4">
+            <button
+              @click="closeList"
+              class="text-gray-400 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div>
+              <h2 class="text-3xl font-bold text-white flex items-center gap-2">
+                <span x-text="currentList?.name"></span>
+                <span x-show="currentList?.is_default" class="text-sm bg-primary-600 text-white px-3 py-1 rounded-full">Default</span>
+              </h2>
+              <p class="text-gray-400 mt-1">
+                <span x-text="completedCount"></span> of <span x-text="items.length"></span> items completed
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              @click="createCategory"
+              class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors text-sm">
+              + Category
+            </button>
+            <button
+              x-show="!currentList?.is_default"
+              @click="setDefaultList"
+              class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors text-sm">
+              Set as Default
+            </button>
+            <button
+              @click="clearDone"
+              x-show="completedCount > 0"
+              class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors text-sm">
+              Clear Done
+            </button>
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div x-show="items.length > 0" class="mb-6 bg-gray-700 rounded-full h-3 overflow-hidden">
+          <div
+            class="bg-primary-600 h-full transition-all duration-300"
+            :style="`width: ${items.length > 0 ? (completedCount / items.length * 100) : 0}%`">
+          </div>
+        </div>
+
+        <!-- Add Item Input -->
+        <div class="bg-gray-800 rounded-xl border border-gray-700 p-4 mb-6">
+          <form @submit.prevent="addItem" class="flex flex-col sm:flex-row gap-2">
+            <input
+              x-model="newItemName"
+              type="text"
+              placeholder="Add an item..."
+              class="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+            <input
+              x-model="newItemQuantity"
+              type="text"
+              placeholder="Qty"
+              class="w-full sm:w-24 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+            <select
+              x-model="newItemCategory"
+              class="w-full sm:w-40 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+              <option :value="null">No category</option>
+              <template x-for="category in categories" :key="category.id">
+                <option :value="category.id" x-text="category.name"></option>
+              </template>
+            </select>
+            <button
+              type="submit"
+              class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
+              Add
+            </button>
+          </form>
+        </div>
+
+        <!-- Items List -->
+        <div x-show="items.length === 0" class="text-center py-16">
+          <div class="text-6xl mb-4">📝</div>
+          <h3 class="text-xl font-semibold text-gray-300 mb-2">No items yet</h3>
+          <p class="text-gray-500">Add your first item above</p>
+        </div>
+
+        <div x-show="items.length > 0" class="space-y-6">
+          <template x-for="group in groupedItems" :key="group.categoryId">
+            <div>
+              <!-- Category Header -->
+              <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3" x-text="group.categoryName"></h3>
+
+              <!-- Items in Category -->
+              <div class="space-y-3">
+                <template x-for="item in group.items" :key="item.id">
+                  <div
+                    class="bg-gray-800 rounded-lg border border-gray-700 p-4 flex items-center gap-4 hover:border-gray-600 transition-colors"
+                    :class="{'opacity-60': item.done}">
+                    <!-- Checkbox -->
+                    <button
+                      @click="toggleItem(item.id)"
+                      class="flex-shrink-0 w-6 h-6 rounded border-2 transition-colors flex items-center justify-center"
+                      :class="item.done ? 'bg-primary-600 border-primary-600' : 'border-gray-600 hover:border-primary-600'">
+                      <svg x-show="item.done" class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+
+                    <!-- Item Info -->
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-baseline gap-2">
+                        <span class="text-white font-medium" :class="{'line-through': item.done}" x-text="item.name"></span>
+                        <span x-show="item.quantity" class="text-gray-400 text-sm" x-text="item.quantity"></span>
+                      </div>
+                      <p x-show="item.note" class="text-gray-500 text-sm mt-1" x-text="item.note"></p>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex items-center gap-2">
+                      <button
+                        @click="editItem(item)"
+                        class="text-gray-400 hover:text-white transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button
+                        @click="deleteItem(item.id)"
+                        class="text-gray-400 hover:text-red-500 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Edit/Create Recipe Modal -->
+  <div
+    x-show="showEditModal"
+    @click.self="showEditModal = false"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+    x-transition>
+    <div
+      @click.stop
+      class="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
+      <div class="sticky top-0 bg-gray-800 border-b border-gray-700 p-6 flex justify-between items-center">
+        <h2 class="text-2xl font-bold text-white" x-text="editingRecipe.id ? 'Edit Recipe' : 'New Recipe'"></h2>
+        <button @click="showEditModal = false" class="text-gray-400 hover:text-white transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-6">
+        <!-- Basic Info -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Recipe Name *</label>
+          <input
+            x-model="editingRecipe.name"
+            type="text"
+            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            placeholder="e.g., Chocolate Chip Cookies">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
+          <textarea
+            x-model="editingRecipe.description"
+            rows="2"
+            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            placeholder="Brief description"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Notes</label>
+          <textarea
+            x-model="editingRecipe.notes"
+            rows="2"
+            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            placeholder="Tips, variations, serving suggestions"></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Servings</label>
+            <input
+              x-model="editingRecipe.servings"
+              type="number"
+              min="1"
+              class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Prep Time</label>
+            <input
+              x-model="editingRecipe.prep_time"
+              type="text"
+              class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              placeholder="e.g., 15 mins">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Cook Time</label>
+            <input
+              x-model="editingRecipe.cook_time"
+              type="text"
+              class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              placeholder="e.g., 30 mins">
+          </div>
+        </div>
+
+        <!-- Photo Upload -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Photo</label>
+          <input
+            type="file"
+            accept="image/*"
+            @change="handlePhotoUpload($event)"
+            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary-600 file:text-white hover:file:bg-primary-700">
+          <template x-if="editingRecipe.photo">
+            <img :src="editingRecipe.photo" class="mt-2 max-h-48 rounded-lg">
+          </template>
+        </div>
+
+        <!-- Ingredients -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Ingredients (drag to reorder)</label>
+          <div class="space-y-2 mb-2">
+            <template x-for="(ing, index) in editingRecipe.ingredients" :key="index">
+              <div
+                draggable="true"
+                @dragstart="dragStart($event, index, 'ingredient')"
+                @dragend="dragEnd($event)"
+                @dragover.prevent="dragOver($event, index, 'ingredient')"
+                @drop="drop($event, index, 'ingredient')"
+                :class="{'opacity-50': draggingIndex === index && draggingType === 'ingredient', 'border-primary-500': dragOverIndex === index && draggingType === 'ingredient'}"
+                class="flex gap-2 items-center cursor-move border border-gray-600 rounded-lg p-2 hover:border-gray-500 transition-colors">
+                <svg class="w-5 h-5 text-gray-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"></path>
+                </svg>
+                <input
+                  x-model="ing.quantity"
+                  type="text"
+                  class="w-20 px-3 py-2 bg-gray-700 border-0 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Qty"
+                  @click.stop>
+                <input
+                  x-model="ing.unit"
+                  type="text"
+                  class="w-24 px-3 py-2 bg-gray-700 border-0 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Unit"
+                  @click.stop>
+                <input
+                  x-model="ing.name"
+                  type="text"
+                  class="flex-1 px-3 py-2 bg-gray-700 border-0 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Ingredient name"
+                  @click.stop>
+                <button
+                  @click.stop="editingRecipe.ingredients.splice(index, 1)"
+                  class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex-shrink-0">
+                  ×
+                </button>
+              </div>
+            </template>
+          </div>
+          <button
+            @click="editingRecipe.ingredients.push({name: '', quantity: '', unit: ''})"
+            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors">
+            + Add Ingredient
+          </button>
+        </div>
+
+        <!-- Steps -->
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Instructions (drag to reorder)</label>
+          <div class="space-y-2 mb-2">
+            <template x-for="(step, index) in editingRecipe.steps" :key="index">
+              <div
+                draggable="true"
+                @dragstart="dragStart($event, index, 'step')"
+                @dragend="dragEnd($event)"
+                @dragover.prevent="dragOver($event, index, 'step')"
+                @drop="drop($event, index, 'step')"
+                :class="{'opacity-50': draggingIndex === index && draggingType === 'step', 'border-primary-500': dragOverIndex === index && draggingType === 'step'}"
+                class="flex gap-2 items-start cursor-move border border-gray-600 rounded-lg p-2 hover:border-gray-500 transition-colors">
+                <svg class="w-5 h-5 text-gray-500 flex-shrink-0 mt-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"></path>
+                </svg>
+                <div class="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold text-sm" x-text="index + 1"></div>
+                <textarea
+                  x-model="step.instruction"
+                  rows="2"
+                  class="flex-1 px-3 py-2 bg-gray-700 border-0 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Step instruction"
+                  @click.stop></textarea>
+                <button
+                  @click.stop="editingRecipe.steps.splice(index, 1)"
+                  class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors self-start flex-shrink-0">
+                  ×
+                </button>
+              </div>
+            </template>
+          </div>
+          <button
+            @click="editingRecipe.steps.push({instruction: ''})"
+            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors">
+            + Add Step
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="sticky bottom-0 bg-gray-800 border-t border-gray-700 p-6 flex justify-end gap-3">
+        <button
+          @click="showEditModal = false"
+          class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors">
+          Cancel
+        </button>
+        <button
+          @click="saveRecipe"
+          class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
+          Save Recipe
+        </button>
+      </div>
     </div>
   </div>
-</section>
 
-<!-- ─── DETAIL VIEW ─── -->
-<section class="view" id="viewDetail">
-  <div class="detail-topbar">
-    <button class="detail-topbar__back" id="btnBack">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-    </button>
-    <div class="detail-topbar__title"><input id="detailNameInput" /></div>
-    <div id="detailTopActions"></div>
-  </div>
-  <div class="detail-stats">
-    <div class="detail-stats__bar"><div class="detail-stats__fill" id="statsFill"></div></div>
-    <span class="detail-stats__label" id="statsLabel">0 / 0</span>
-  </div>
-  <div class="detail-body" id="detailBody"></div>
-  <div class="detail-footer" id="detailFooter">
-    <button class="btn btn--ghost btn--sm" id="btnAddCategory">+ Category</button>
-    <button class="btn btn--ghost btn--sm btn--danger" id="btnClearDone">Clear done</button>
-  </div>
-</section>
+  <!-- Edit Item Modal -->
+  <div
+    x-show="showEditItemModal"
+    @click.self="showEditItemModal = false; editingItem = null"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+    x-transition>
+    <div
+      @click.stop
+      class="bg-gray-800 rounded-xl max-w-md w-full border border-gray-700">
+      <!-- Modal Header -->
+      <div class="border-b border-gray-700 p-6">
+        <h2 class="text-2xl font-bold text-white">Edit Item</h2>
+      </div>
 
-<!-- ─── RECIPES VIEW ─── -->
-<section class="view" id="viewRecipes">
-  <div class="lists-header">
-    <h1>Your <em>recipes</em></h1>
-    <div style="display: flex; gap: 8px;">
-      <input type="file" id="importRecipeFile" accept=".json" style="display:none;" />
-      <button class="btn btn--ghost" id="btnImportRecipes">📥 Import</button>
-      <button class="btn btn--ghost" id="btnExportAllRecipes">📤 Export All</button>
-      <button class="btn btn--primary" id="btnNewRecipe">+ New recipe</button>
+      <!-- Modal Body -->
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Item Name</label>
+          <input
+            x-model="editingItem.name"
+            type="text"
+            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            placeholder="Item name">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Quantity</label>
+          <input
+            x-model="editingItem.quantity"
+            type="text"
+            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            placeholder="e.g., 2, 1 lb, 500g">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Category</label>
+          <select
+            x-model="editingItem.category"
+            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <option :value="null">No category</option>
+            <template x-for="category in categories" :key="category.id">
+              <option :value="category.id" x-text="category.name"></option>
+            </template>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-2">Note</label>
+          <input
+            x-model="editingItem.note"
+            type="text"
+            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            placeholder="Optional note">
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="border-t border-gray-700 p-6 flex justify-end gap-3">
+        <button
+          @click="showEditItemModal = false; editingItem = null"
+          class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors">
+          Cancel
+        </button>
+        <button
+          @click="saveEditedItem"
+          class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
+          Save
+        </button>
+      </div>
     </div>
   </div>
-  <div class="lists-grid" id="recipesGrid">
-    <div class="empty-state" id="recipesEmpty">
-      <div class="empty-state__icon">📖</div>
-      <p>No recipes yet. Create one to get cooking!</p>
+
+  <!-- Input Modal -->
+  <div
+    x-show="showInputModal"
+    @click.self="showInputModal = false; inputModalCallback = null"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+    x-transition>
+    <div
+      @click.stop
+      class="bg-gray-800 rounded-xl max-w-md w-full border border-gray-700">
+      <!-- Modal Header -->
+      <div class="border-b border-gray-700 p-6">
+        <h2 class="text-2xl font-bold text-white" x-text="inputModalTitle"></h2>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6">
+        <label x-show="inputModalLabel" class="block text-sm font-medium text-gray-300 mb-2" x-text="inputModalLabel"></label>
+        <input
+          x-model="inputModalValue"
+          type="text"
+          :placeholder="inputModalPlaceholder"
+          @keydown.enter="confirmInput"
+          @keydown.escape="showInputModal = false; inputModalCallback = null"
+          class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+          x-ref="inputModalInput">
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="border-t border-gray-700 p-6 flex justify-end gap-3">
+        <button
+          @click="showInputModal = false; inputModalCallback = null"
+          class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors">
+          Cancel
+        </button>
+        <button
+          @click="confirmInput"
+          class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors">
+          OK
+        </button>
+      </div>
     </div>
   </div>
-</section>
 
-<!-- ─── RECIPE DETAIL VIEW ─── -->
-<section class="view" id="viewRecipeDetail">
-  <div class="detail-topbar">
-    <button class="detail-topbar__back" id="btnBackRecipe">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-    </button>
-    <div class="detail-topbar__title"><input id="recipeNameInput" /></div>
-    <div id="recipeTopActions"></div>
-  </div>
-  <div class="detail-body">
-    <div class="recipe-photo-container" id="recipePhoto"></div>
-    <div class="recipe-meta" id="recipeMeta"></div>
-    <div class="recipe-section" id="recipeIngredientsSection"></div>
-    <div class="recipe-section" id="recipeStepsSection"></div>
-  </div>
-</section>
+  <!-- Confirm Modal -->
+  <div
+    x-show="showConfirmModal"
+    @click.self="showConfirmModal = false; confirmModalCallback = null"
+    class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+    x-transition>
+    <div
+      @click.stop
+      class="bg-gray-800 rounded-xl max-w-md w-full border border-gray-700">
+      <!-- Modal Header -->
+      <div class="border-b border-gray-700 p-6">
+        <h2 class="text-2xl font-bold text-white" x-text="confirmModalTitle"></h2>
+      </div>
 
-<!-- ─── MODAL ─── -->
-<div class="modal-overlay" id="modalOverlay">
-  <div class="modal" id="modalBox">
-    <h2 id="modalTitle">Title</h2>
-    <p id="modalDesc"></p>
-    <div id="modalBody"></div>
-    <div class="modal__actions" id="modalActions"></div>
-  </div>
-</div>
+      <!-- Modal Body -->
+      <div class="p-6">
+        <p class="text-gray-300" x-text="confirmModalMessage"></p>
+      </div>
 
-<script src="js/app.js"></script>
+      <!-- Modal Footer -->
+      <div class="border-t border-gray-700 p-6 flex justify-end gap-3">
+        <button
+          @click="showConfirmModal = false; confirmModalCallback = null"
+          class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
+          x-text="confirmModalDestructive ? 'Cancel' : 'No'">
+        </button>
+        <button
+          @click="confirmAction"
+          :class="confirmModalDestructive ? 'bg-red-600 hover:bg-red-700' : 'bg-primary-600 hover:bg-primary-700'"
+          class="px-6 py-2 text-white rounded-lg font-medium transition-colors"
+          x-text="confirmModalDestructive ? 'Delete' : 'Yes'">
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for import -->
+  <input type="file" id="importFileInput" accept=".json" @change="handleImport($event)" class="hidden">
+
+  <!-- Alpine.js App -->
+  <script>
+    function app() {
+      return {
+        // State
+        currentView: 'recipes',
+        mobileMenuOpen: false,
+        recipes: [],
+        currentRecipe: null,
+        ingredients: [],
+        steps: [],
+        showEditModal: false,
+        editingRecipe: {},
+        scaleFactor: 1,
+        draggingIndex: null,
+        dragOverIndex: null,
+        draggingType: null,
+        searchQuery: '',
+        sortBy: 'name-asc',
+        // Shopping Lists
+        lists: [],
+        currentList: null,
+        items: [],
+        categories: [],
+        newItemName: '',
+        newItemQuantity: '',
+        newItemCategory: null,
+        showEditItemModal: false,
+        editingItem: null,
+        // Modals
+        showInputModal: false,
+        inputModalTitle: '',
+        inputModalLabel: '',
+        inputModalValue: '',
+        inputModalPlaceholder: '',
+        inputModalCallback: null,
+        showConfirmModal: false,
+        confirmModalTitle: '',
+        confirmModalMessage: '',
+        confirmModalCallback: null,
+        confirmModalDestructive: true,
+
+        // Computed
+        get scaledServings() {
+          if (!this.currentRecipe) return 0;
+          return Math.round((this.currentRecipe.servings || 4) * this.scaleFactor);
+        },
+
+        get filteredRecipes() {
+          let filtered = this.recipes;
+
+          // Filter by search query
+          if (this.searchQuery.trim()) {
+            const query = this.searchQuery.toLowerCase();
+            filtered = filtered.filter(recipe =>
+              recipe.name.toLowerCase().includes(query) ||
+              (recipe.description && recipe.description.toLowerCase().includes(query))
+            );
+          }
+
+          // Sort
+          const sorted = [...filtered];
+          switch (this.sortBy) {
+            case 'name-asc':
+              sorted.sort((a, b) => a.name.localeCompare(b.name));
+              break;
+            case 'name-desc':
+              sorted.sort((a, b) => b.name.localeCompare(a.name));
+              break;
+            case 'date-desc':
+              sorted.sort((a, b) => new Date(b.created) - new Date(a.created));
+              break;
+            case 'date-asc':
+              sorted.sort((a, b) => new Date(a.created) - new Date(b.created));
+              break;
+          }
+
+          return sorted;
+        },
+
+        get completedCount() {
+          return this.items.filter(item => item.done).length;
+        },
+
+        get groupedItems() {
+          const groups = {};
+
+          // Group items by category
+          this.items.forEach(item => {
+            const categoryId = item.category || 'uncategorized';
+            if (!groups[categoryId]) {
+              groups[categoryId] = [];
+            }
+            groups[categoryId].push(item);
+          });
+
+          // Convert to array with category names
+          const result = [];
+
+          // Add categorized items first
+          this.categories.forEach(category => {
+            if (groups[category.id] && groups[category.id].length > 0) {
+              result.push({
+                categoryId: category.id,
+                categoryName: category.name,
+                items: groups[category.id]
+              });
+            }
+          });
+
+          // Add uncategorized items last
+          if (groups['uncategorized'] && groups['uncategorized'].length > 0) {
+            result.push({
+              categoryId: 'uncategorized',
+              categoryName: 'Uncategorized',
+              items: groups['uncategorized']
+            });
+          }
+
+          return result;
+        },
+
+        // Initialize
+        async init() {
+          await this.loadRecipes();
+          await this.loadLists();
+        },
+
+        // Modal Helpers
+        showInput(title, label, placeholder, defaultValue, callback) {
+          this.inputModalTitle = title;
+          this.inputModalLabel = label;
+          this.inputModalPlaceholder = placeholder || '';
+          this.inputModalValue = defaultValue || '';
+          this.inputModalCallback = callback;
+          this.showInputModal = true;
+
+          // Focus input after modal opens
+          this.$nextTick(() => {
+            if (this.$refs.inputModalInput) {
+              this.$refs.inputModalInput.focus();
+            }
+          });
+        },
+
+        confirmInput() {
+          if (this.inputModalCallback && this.inputModalValue.trim()) {
+            this.inputModalCallback(this.inputModalValue);
+          }
+          this.showInputModal = false;
+          this.inputModalCallback = null;
+        },
+
+        showConfirm(title, message, callback, destructive = true) {
+          this.confirmModalTitle = title;
+          this.confirmModalMessage = message;
+          this.confirmModalCallback = callback;
+          this.confirmModalDestructive = destructive;
+          this.showConfirmModal = true;
+        },
+
+        confirmAction() {
+          if (this.confirmModalCallback) {
+            this.confirmModalCallback();
+          }
+          this.showConfirmModal = false;
+          this.confirmModalCallback = null;
+        },
+
+        // API Helper
+        async api(method, path, body) {
+          const opts = { method, headers: {} };
+          if (body) {
+            opts.headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(body);
+          }
+          const response = await fetch('/api' + path, opts);
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+          return response.json();
+        },
+
+        // Recipes List
+        async loadRecipes() {
+          try {
+            this.recipes = await this.api('GET', '/recipes');
+          } catch (err) {
+            console.error('Error loading recipes:', err);
+            alert('Failed to load recipes: ' + err.message);
+          }
+        },
+
+        async openRecipe(id) {
+          try {
+            this.currentRecipe = await this.api('GET', `/recipes/${id}`);
+            this.ingredients = await this.api('GET', `/recipes/${id}/ingredients`);
+            this.steps = await this.api('GET', `/recipes/${id}/steps`);
+            this.scaleFactor = 1;
+          } catch (err) {
+            console.error('Error loading recipe:', err);
+            alert('Failed to load recipe: ' + err.message);
+          }
+        },
+
+        async addToShoppingList() {
+          if (!this.currentRecipe) return;
+
+          try {
+            const result = await this.api('POST', `/recipes/${this.currentRecipe.id}/add-to-shopping-list`);
+
+            let message = result.message || 'Ingredients added to shopping list!';
+            if (result.skipped && result.skipped.length > 0) {
+              message += '\n\nSkipped (already in list): ' + result.skipped.join(', ');
+            }
+
+            this.showConfirm(
+              'Success!',
+              message + '\n\nWould you like to view your shopping list now?',
+              () => {
+                this.currentView = 'lists';
+                this.currentRecipe = null;
+              },
+              false  // Not a destructive action
+            );
+          } catch (err) {
+            if (err.message.includes('No default list')) {
+              alert('No default shopping list set.\n\nPlease go to Shopping Lists and set a default list first.');
+            } else {
+              alert('Failed to add ingredients: ' + err.message);
+            }
+          }
+        },
+
+        async addIngredientToList(ingredient, event) {
+          try {
+            // Get default list
+            const defaultList = await this.api('GET', '/lists/default');
+
+            // Prepare item data
+            const item = {
+              name: ingredient.name,
+              quantity: ingredient.quantity || '',
+              note: ingredient.unit || ''
+            };
+
+            // Add to list
+            await this.api('POST', `/lists/${defaultList.id}/items`, item);
+
+            // Show brief success feedback
+            const button = event.target.closest('button');
+            if (button) {
+              button.classList.add('bg-green-600');
+              button.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>';
+              setTimeout(() => {
+                button.classList.remove('bg-green-600');
+                button.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>';
+              }, 1500);
+            }
+          } catch (err) {
+            if (err.message.includes('No default list')) {
+              alert('No default shopping list set.\n\nPlease go to Shopping Lists and set a default list first.');
+            } else {
+              alert('Failed to add ingredient: ' + err.message);
+            }
+          }
+        },
+
+        // Scaling
+        increaseServings() {
+          const newServings = this.scaledServings + 1;
+          this.scaleFactor = newServings / (this.currentRecipe.servings || 4);
+        },
+
+        decreaseServings() {
+          if (this.scaledServings > 1) {
+            const newServings = this.scaledServings - 1;
+            this.scaleFactor = newServings / (this.currentRecipe.servings || 4);
+          }
+        },
+
+        resetScale() {
+          this.scaleFactor = 1;
+        },
+
+        scaleQuantity(qtyStr) {
+          if (this.scaleFactor === 1 || !qtyStr) return qtyStr;
+
+          const parsed = this.parseQuantity(qtyStr);
+          if (!parsed || parsed.type === 'text') return qtyStr;
+
+          if (parsed.type === 'range') {
+            const scaledMin = this.formatQuantity(parsed.min * this.scaleFactor);
+            const scaledMax = this.formatQuantity(parsed.max * this.scaleFactor);
+            return `${scaledMin}-${scaledMax}`;
+          }
+
+          if (parsed.type === 'number') {
+            return this.formatQuantity(parsed.value * this.scaleFactor);
+          }
+
+          return qtyStr;
+        },
+
+        parseQuantity(qtyStr) {
+          if (!qtyStr || typeof qtyStr !== 'string') return null;
+          qtyStr = qtyStr.trim();
+          if (!qtyStr) return null;
+
+          // Handle ranges
+          if (qtyStr.includes('-')) {
+            const parts = qtyStr.split('-').map(p => this.parseQuantity(p.trim()));
+            if (parts[0] !== null && parts[1] !== null) {
+              return { type: 'range', min: parts[0].value, max: parts[1].value };
+            }
+          }
+
+          // Mixed number: "1 1/2"
+          const mixedMatch = qtyStr.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+          if (mixedMatch) {
+            const whole = parseInt(mixedMatch[1]);
+            const numerator = parseInt(mixedMatch[2]);
+            const denominator = parseInt(mixedMatch[3]);
+            return { type: 'number', value: whole + numerator / denominator };
+          }
+
+          // Fraction: "1/2"
+          const fractionMatch = qtyStr.match(/^(\d+)\/(\d+)$/);
+          if (fractionMatch) {
+            const numerator = parseInt(fractionMatch[1]);
+            const denominator = parseInt(fractionMatch[2]);
+            return { type: 'number', value: numerator / denominator };
+          }
+
+          // Decimal: "2.5" or "2"
+          const decimalMatch = qtyStr.match(/^(\d*\.?\d+)$/);
+          if (decimalMatch) {
+            return { type: 'number', value: parseFloat(decimalMatch[1]) };
+          }
+
+          return { type: 'text', value: qtyStr };
+        },
+
+        formatQuantity(num) {
+          const commonFractions = {
+            0.125: '⅛', 0.25: '¼', 0.333: '⅓', 0.375: '⅜',
+            0.5: '½', 0.625: '⅝', 0.666: '⅔', 0.75: '¾', 0.875: '⅞'
+          };
+
+          const whole = Math.floor(num);
+          const decimal = num - whole;
+
+          for (const [dec, frac] of Object.entries(commonFractions)) {
+            if (Math.abs(decimal - parseFloat(dec)) < 0.01) {
+              if (whole === 0) return frac;
+              return `${whole} ${frac}`;
+            }
+          }
+
+          const rounded = Math.round(num * 100) / 100;
+          const str = rounded.toString();
+          return str.includes('.') ? str.replace(/\.?0+$/, '') : str;
+        },
+
+        // Create/Edit
+        createRecipe() {
+          this.editingRecipe = {
+            name: '',
+            description: '',
+            notes: '',
+            servings: 4,
+            prep_time: '',
+            cook_time: '',
+            photo: '',
+            ingredients: [],
+            steps: []
+          };
+          this.showEditModal = true;
+        },
+
+        async editRecipe(id) {
+          try {
+            const recipe = await this.api('GET', `/recipes/${id}`);
+            const ingredients = await this.api('GET', `/recipes/${id}/ingredients`);
+            const steps = await this.api('GET', `/recipes/${id}/steps`);
+
+            this.editingRecipe = {
+              id: recipe.id,
+              name: recipe.name,
+              description: recipe.description || '',
+              notes: recipe.notes || '',
+              servings: recipe.servings || 4,
+              prep_time: recipe.prep_time || '',
+              cook_time: recipe.cook_time || '',
+              photo: recipe.photo || '',
+              ingredients: ingredients.map(i => ({
+                id: i.id,
+                name: i.name,
+                quantity: i.quantity || '',
+                unit: i.unit || ''
+              })),
+              steps: steps.map(s => ({
+                id: s.id,
+                instruction: s.instruction
+              }))
+            };
+            this.showEditModal = true;
+          } catch (err) {
+            alert('Failed to load recipe for editing: ' + err.message);
+          }
+        },
+
+        async saveRecipe() {
+          if (!this.editingRecipe.name.trim()) {
+            alert('Please enter a recipe name');
+            return;
+          }
+
+          try {
+            let recipeId = this.editingRecipe.id;
+
+            // Create or update recipe
+            if (recipeId) {
+              await this.api('PUT', `/recipes/${recipeId}`, {
+                name: this.editingRecipe.name,
+                description: this.editingRecipe.description,
+                notes: this.editingRecipe.notes,
+                servings: parseInt(this.editingRecipe.servings) || 4,
+                prep_time: this.editingRecipe.prep_time,
+                cook_time: this.editingRecipe.cook_time
+              });
+            } else {
+              const result = await this.api('POST', '/recipes', {
+                name: this.editingRecipe.name,
+                description: this.editingRecipe.description,
+                notes: this.editingRecipe.notes,
+                servings: parseInt(this.editingRecipe.servings) || 4,
+                prep_time: this.editingRecipe.prep_time,
+                cook_time: this.editingRecipe.cook_time
+              });
+              recipeId = result.id;
+            }
+
+            // Upload photo if changed
+            if (this.editingRecipe.photoFile) {
+              const formData = new FormData();
+              formData.append('photo', this.editingRecipe.photoFile);
+
+              await fetch(`/api/recipes/${recipeId}/photo`, {
+                method: 'PUT',
+                body: formData
+              });
+            }
+
+            // Save ingredients
+            if (this.editingRecipe.id) {
+              // Delete existing
+              const existingIngredients = await this.api('GET', `/recipes/${recipeId}/ingredients`);
+              for (const ing of existingIngredients) {
+                await this.api('DELETE', `/recipes/${recipeId}/ingredients/${ing.id}`);
+              }
+            }
+
+            for (const ing of this.editingRecipe.ingredients) {
+              if (ing.name.trim()) {
+                await this.api('POST', `/recipes/${recipeId}/ingredients`, {
+                  name: ing.name,
+                  quantity: ing.quantity,
+                  unit: ing.unit
+                });
+              }
+            }
+
+            // Save steps
+            if (this.editingRecipe.id) {
+              // Delete existing
+              const existingSteps = await this.api('GET', `/recipes/${recipeId}/steps`);
+              for (const step of existingSteps) {
+                await this.api('DELETE', `/recipes/${recipeId}/steps/${step.id}`);
+              }
+            }
+
+            for (const step of this.editingRecipe.steps) {
+              if (step.instruction.trim()) {
+                await this.api('POST', `/recipes/${recipeId}/steps`, {
+                  instruction: step.instruction
+                });
+              }
+            }
+
+            this.showEditModal = false;
+            await this.loadRecipes();
+
+            if (this.currentRecipe && this.currentRecipe.id === recipeId) {
+              await this.openRecipe(recipeId);
+            }
+          } catch (err) {
+            alert('Failed to save recipe: ' + err.message);
+          }
+        },
+
+        handlePhotoUpload(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          this.editingRecipe.photoFile = file;
+
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.editingRecipe.photo = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        },
+
+        async deleteRecipe(id) {
+          this.showConfirm(
+            'Delete Recipe',
+            'Are you sure you want to delete this recipe? This action cannot be undone.',
+            async () => {
+              try {
+                await this.api('DELETE', `/recipes/${id}`);
+                this.currentRecipe = null;
+                await this.loadRecipes();
+              } catch (err) {
+                alert('Failed to delete recipe: ' + err.message);
+              }
+            }
+          );
+        },
+
+        // Drag and Drop for Edit Modal
+        dragStart(event, index, type) {
+          this.draggingIndex = index;
+          this.draggingType = type;
+          event.dataTransfer.effectAllowed = 'move';
+        },
+
+        dragEnd(event) {
+          this.draggingIndex = null;
+          this.dragOverIndex = null;
+          this.draggingType = null;
+        },
+
+        dragOver(event, index, type) {
+          if (this.draggingType !== type) return;
+          this.dragOverIndex = index;
+        },
+
+        drop(event, dropIndex, type) {
+          event.preventDefault();
+          if (this.draggingType !== type || this.draggingIndex === null) return;
+
+          const dragIndex = this.draggingIndex;
+          if (dragIndex === dropIndex) {
+            this.dragEnd(event);
+            return;
+          }
+
+          // Reorder array
+          const array = type === 'ingredient' ? this.editingRecipe.ingredients : this.editingRecipe.steps;
+          const item = array.splice(dragIndex, 1)[0];
+          array.splice(dropIndex, 0, item);
+
+          this.dragEnd(event);
+        },
+
+        // Import/Export
+        openImportDialog() {
+          document.getElementById('importFileInput').click();
+        },
+
+        async handleImport(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+
+            await this.api('POST', '/recipes/import', data);
+            await this.loadRecipes();
+            alert('Recipes imported successfully!');
+          } catch (err) {
+            alert('Failed to import recipes: ' + err.message);
+          }
+
+          event.target.value = '';
+        },
+
+        async exportRecipe(id) {
+          try {
+            const data = await this.api('GET', `/recipes/${id}/export`);
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${data.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_recipe.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (err) {
+            alert('Failed to export recipe: ' + err.message);
+          }
+        },
+
+        async exportAllRecipes() {
+          try {
+            const data = await this.api('GET', '/recipes/export');
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `recipes_export_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch (err) {
+            alert('Failed to export recipes: ' + err.message);
+          }
+        },
+
+        // Shopping Lists Methods
+        async loadLists() {
+          try {
+            this.lists = await this.api('GET', '/lists');
+            // Load item counts for each list
+            await Promise.all(this.lists.map(async (list) => {
+              try {
+                const items = await this.api('GET', `/lists/${list.id}/items`);
+                list.itemCount = items.length;
+              } catch (err) {
+                list.itemCount = 0;
+              }
+            }));
+          } catch (err) {
+            console.error('Error loading lists:', err);
+          }
+        },
+
+        async createList() {
+          this.showInput(
+            'New Shopping List',
+            'List Name',
+            'e.g., Weekly Groceries',
+            '',
+            async (name) => {
+              try {
+                await this.api('POST', '/lists', { name });
+                await this.loadLists();
+              } catch (err) {
+                alert('Failed to create list: ' + err.message);
+              }
+            }
+          );
+        },
+
+        async renameList(list) {
+          this.showInput(
+            'Rename List',
+            'List Name',
+            '',
+            list.name,
+            async (name) => {
+              if (name === list.name) return;
+
+              try {
+                await this.api('PUT', `/lists/${list.id}`, { name });
+                await this.loadLists();
+                if (this.currentList && this.currentList.id === list.id) {
+                  this.currentList = this.lists.find(l => l.id === list.id);
+                }
+              } catch (err) {
+                alert('Failed to rename list: ' + err.message);
+              }
+            }
+          );
+        },
+
+        async deleteList(listId) {
+          this.showConfirm(
+            'Delete List',
+            'Are you sure you want to delete this list and all its items? This action cannot be undone.',
+            async () => {
+              try {
+                await this.api('DELETE', `/lists/${listId}`);
+                await this.loadLists();
+                if (this.currentList && this.currentList.id === listId) {
+                  this.closeList();
+                }
+              } catch (err) {
+                alert('Failed to delete list: ' + err.message);
+              }
+            }
+          );
+        },
+
+        async openList(id) {
+          try {
+            this.currentList = this.lists.find(l => l.id === id);
+            await this.loadItems();
+          } catch (err) {
+            alert('Failed to open list: ' + err.message);
+          }
+        },
+
+        closeList() {
+          this.currentList = null;
+          this.items = [];
+          this.categories = [];
+          this.newItemName = '';
+          this.newItemQuantity = '';
+          this.newItemCategory = null;
+        },
+
+        async setDefaultList() {
+          if (!this.currentList) return;
+
+          try {
+            await this.api('POST', `/lists/${this.currentList.id}/set-default`);
+            await this.loadLists();
+            this.currentList = this.lists.find(l => l.id === this.currentList.id);
+          } catch (err) {
+            alert('Failed to set default list: ' + err.message);
+          }
+        },
+
+        async loadItems() {
+          if (!this.currentList) return;
+
+          try {
+            this.items = await this.api('GET', `/lists/${this.currentList.id}/items`);
+            this.categories = await this.api('GET', `/lists/${this.currentList.id}/categories`);
+          } catch (err) {
+            console.error('Error loading items:', err);
+          }
+        },
+
+        async addItem() {
+          if (!this.newItemName.trim() || !this.currentList) return;
+
+          try {
+            await this.api('POST', `/lists/${this.currentList.id}/items`, {
+              name: this.newItemName,
+              quantity: this.newItemQuantity || '',
+              category: this.newItemCategory
+            });
+
+            this.newItemName = '';
+            this.newItemQuantity = '';
+            this.newItemCategory = null;
+            await this.loadItems();
+          } catch (err) {
+            alert('Failed to add item: ' + err.message);
+          }
+        },
+
+        async toggleItem(itemId) {
+          if (!this.currentList) return;
+
+          try {
+            await this.api('POST', `/lists/${this.currentList.id}/items/${itemId}/toggle`);
+            await this.loadItems();
+          } catch (err) {
+            alert('Failed to toggle item: ' + err.message);
+          }
+        },
+
+        editItem(item) {
+          this.editingItem = { ...item };
+          this.showEditItemModal = true;
+        },
+
+        async saveEditedItem() {
+          if (!this.editingItem || !this.editingItem.name.trim()) {
+            alert('Item name is required');
+            return;
+          }
+
+          try {
+            await this.api('PUT', `/lists/${this.currentList.id}/items/${this.editingItem.id}`, {
+              name: this.editingItem.name,
+              quantity: this.editingItem.quantity || '',
+              note: this.editingItem.note || '',
+              category: this.editingItem.category
+            });
+            this.showEditItemModal = false;
+            this.editingItem = null;
+            await this.loadItems();
+          } catch (err) {
+            alert('Failed to edit item: ' + err.message);
+          }
+        },
+
+        async deleteItem(itemId) {
+          this.showConfirm(
+            'Delete Item',
+            'Are you sure you want to delete this item?',
+            async () => {
+              try {
+                await this.api('DELETE', `/lists/${this.currentList.id}/items/${itemId}`);
+                await this.loadItems();
+              } catch (err) {
+                alert('Failed to delete item: ' + err.message);
+              }
+            }
+          );
+        },
+
+        async clearDone() {
+          this.showConfirm(
+            'Clear Completed Items',
+            'Are you sure you want to remove all completed items from this list?',
+            async () => {
+              try {
+                await this.api('DELETE', `/lists/${this.currentList.id}/items/clear-done`);
+                await this.loadItems();
+              } catch (err) {
+                alert('Failed to clear done items: ' + err.message);
+              }
+            }
+          );
+        },
+
+        async createCategory() {
+          if (!this.currentList) return;
+
+          this.showInput(
+            'New Category',
+            'Category Name',
+            'e.g., Produce, Dairy, Meat',
+            '',
+            async (name) => {
+              try {
+                await this.api('POST', `/lists/${this.currentList.id}/categories`, { name });
+                await this.loadItems();
+              } catch (err) {
+                alert('Failed to create category: ' + err.message);
+              }
+            }
+          );
+        }
+      }
+    }
+  </script>
+
 </body>
 </html>

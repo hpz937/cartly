@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix recipe scaling bug with whole numbers\n\nBug: formatQuantity\\(\\) was removing trailing zeros from whole numbers,\ncausing 500 to display as \"5\", 1000 as \"1\", etc.\n\nRoot cause: The regex /\\\\.?0+$/ was matching trailing zeros in any\nnumber, not just after decimal points.\n\nFix: Only apply the trailing zero removal if the number contains a\ndecimal point. This preserves whole numbers \\(500 stays \"500\"\\) while\nstill cleaning up decimals \\(2.50 becomes \"2.5\"\\).\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
