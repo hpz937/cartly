@@ -20,7 +20,7 @@ docker compose down
 
 | Layer      | Technology          | Role                                      |
 |------------|---------------------|-------------------------------------------|
-| Frontend   | Vanilla HTML/CSS/JS | Single-page app served as static files    |
+| Frontend   | Alpine.js + Tailwind CSS | Single-page app with reactive components |
 | Reverse Proxy | Nginx (Alpine)   | Serves static files, proxies `/api/*`     |
 | Backend    | Flask + Gunicorn    | RESTful API, business logic               |
 | Database   | SQLite (WAL mode)   | Persistent storage via a Docker volume    |
@@ -47,6 +47,9 @@ docker compose down
 - **Default list** — mark one list as your default for quick recipe-to-list workflows
 - **Recipe-to-list** — add all ingredients from a recipe to your default shopping list in one tap
 - **Smart duplicate detection** — automatically skips items already in your list (case-insensitive)
+- **Recipe scaling** — adjust servings with +/- buttons and automatically scale ingredient quantities
+- **Search & sort** — quickly find recipes by name or description, sort by name or date
+- **Theme-matched modals** — beautiful, consistent dialogs that match the dark theme (no jarring browser popups)
 - **Persistent data** — everything survives container restarts (Docker volume)
 
 ## Testing

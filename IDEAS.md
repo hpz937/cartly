@@ -5,11 +5,13 @@ This document tracks potential features, enhancements, and improvements for Cart
 ## High Priority
 
 ### Recipe Search & Filtering
-- [ ] Add search bar to filter recipes by name
+- [x] Add search bar to filter recipes by name
+- [x] Search within recipe descriptions
+- [x] Sort recipes by name (A-Z, Z-A)
+- [x] Sort recipes by date (newest/oldest first)
 - [ ] Search within ingredients (find recipes using "chicken")
 - [ ] Filter by prep time, cook time, servings
 - [ ] Filter by recipes whose ingredients are already in shopping list
-- [ ] Sort recipes by name, date created, or most recently used
 
 ### Recipe Scaling
 - [x] Add servings adjuster with +/- buttons
@@ -94,10 +96,10 @@ This document tracks potential features, enhancements, and improvements for Cart
 ## Low Priority / Nice-to-Have
 
 ### UI/UX Polish
-- [ ] Toast notifications instead of `alert()` dialogs
+- [x] Theme-matched modals instead of browser prompt/confirm dialogs
+- [ ] Toast notifications for success/info messages (currently using modals)
 - [ ] Loading spinners for async operations
-- [ ] Confirmation dialogs for destructive actions
-- [ ] Dark mode toggle
+- [ ] Dark mode toggle (currently always dark)
 - [ ] Customizable theme colors
 - [ ] Print-friendly recipe view (CSS @media print)
 - [ ] Print-friendly shopping list view
@@ -116,10 +118,10 @@ This document tracks potential features, enhancements, and improvements for Cart
 
 #### Frontend Architecture
 - [x] Extract CSS and JavaScript from HTML into separate files
-- [ ] Further split app.js into modules (recipes.js, lists.js, api.js, ui.js)
-- [ ] Consider lightweight framework (Alpine.js, Petite Vue)
-- [ ] Better state management
-- [ ] Component-based architecture
+- [x] Implement Alpine.js for reactive components
+- [x] Implement Tailwind CSS for consistent styling
+- [ ] Further split into modules (recipes.js, lists.js, api.js, ui.js)
+- [ ] Better state management (Pinia or similar)
 - [ ] Reduce duplication in rendering code
 
 #### Performance & Storage
@@ -199,7 +201,10 @@ Have an idea not listed here? Add it! Feel free to:
 
 ## Recently Completed
 
-- ✅ Frontend refactoring: Extract CSS and JS into separate files (2026-02-01)
+- ✅ Theme-matched modals for all user input dialogs (2026-02-01)
+- ✅ Alpine.js + Tailwind CSS frontend rebuild with dark mode (2026-02-01)
+- ✅ Recipe search and sorting (name, date) (2026-02-01)
+- ✅ Shopping list categories with grouping (2026-02-01)
 - ✅ Recipe scaling with servings adjuster (2026-02-01)
 - ✅ Recipe import/export in JSON format (2026-02-01)
 - ✅ Drag-and-drop reordering for ingredients and steps (2026-02-01)
